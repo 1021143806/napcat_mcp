@@ -1,0 +1,148 @@
+{
+  "mcpServers": {
+    "amap": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@amap/amap-maps-mcp-server"
+      ],
+      "env": {
+        "AMAP_MAPS_API_KEY": "your-api-key"
+      }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest",
+        "--headless"
+      ]
+    },
+    "fetch": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-fetch"
+      ]
+    },
+    "slack": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-slack"
+      ],
+      "env": {
+        "SLACK_BOT_TOKEN": "your-bot-token",
+        "SLACK_TEAM_ID": "your-team-id"
+      }
+    },
+    "napcat-group-info-G": {
+      "enabled": true,
+      "owner": "admin",
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "/app/napcat_mcp/run_direct.py"
+      ],
+      "env": {
+        "NAPCAT_HOST": "http://172.19.0.50:3003",
+        "NAPCAT_TOKEN": "",
+        "ALLOWED_GROUPS": ""
+      }
+    },
+    "napcat-group-info-Hilda": {
+      "enabled": true,
+      "owner": "admin",
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "/app/napcat_mcp/run_direct.py"
+      ],
+      "env": {
+        "NAPCAT_HOST": "http://172.19.0.31:3003",
+        "NAPCAT_TOKEN": "",
+        "ALLOWED_GROUPS": ""
+      }
+    },
+    "napcat-full-G": {
+      "enabled": true,
+      "owner": "admin",
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "/app/napcat_mcp/run_direct.py"
+      ],
+      "env": {
+        "NAPCAT_HOST": "http://172.19.0.50:3003",
+        "NAPCAT_TOKEN": "",
+        "ALLOWED_GROUPS": "",
+        "READONLY_MODE": "false"
+      }
+    },
+    "napcat-full-Hilda": {
+      "enabled": true,
+      "owner": "admin",
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "/app/napcat_mcp/run_direct.py"
+      ],
+      "env": {
+        "NAPCAT_HOST": "http://172.19.0.31:3003",
+        "NAPCAT_TOKEN": "",
+        "ALLOWED_GROUPS": "",
+        "READONLY_MODE": "false"
+      }
+    },
+    "weread": {
+      "enabled": true,
+      "owner": "admin",
+      "type": "stdio",
+      "command": "mcp-server-weread",
+      "args": [],
+      "env": {
+        "WEREAD_USERNAME": "",
+        "WEREAD_PASSWORD": "",
+        "WEREAD_COOKIE": "RK=iV21LIpLMa; ptcz=396aba52ea6712c9abb26117e2f394db335170c39386af3354b96ac85e9c7dd3; pgv_pvid=9436809941; wr_gid=277861953; wr_ql=1; wr_fp=3860638697; wr_localvid=94032a40817ba4f96940d71; wr_name=JieI%E7%BE%BD; wr_avatar=https%3A%2F%2Fres.weread.qq.com%2Fwravatar%2FWV0012-rzmTicbJswk1U0QtnWkyFfc%2F0; wr_gender=1; uin=o1021143806; skey=@9up4fmjop; pgv_info=ssid=s9182009030; wr_skey=RWiT0XFP; wr_vid=398086038; wr_rt=o2uxBwvCJgvFLRuf0jMWA7j4QJVE%40zFrVEV5_E6nSloHr9A~_AL"
+      }
+    },
+    "bilibili": {
+      "enabled": true,
+      "owner": "admin",
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/app/mcp_servers/bilibili/node_modules/.bin/mcp-bilibili"
+      ],
+      "env": {}
+    }
+  },
+  "users": [
+    {
+      "username": "admin",
+      "password": "$2b$10$Vt7krIvjNgyN67LXqly0uOcTpN0LI55cYRbcKC71pUDAP0nJ7RPa.",
+      "isAdmin": true
+    }
+  ],
+  "systemConfig": {
+    "oauthServer": {
+      "enabled": true,
+      "accessTokenLifetime": 3600,
+      "refreshTokenLifetime": 1209600,
+      "authorizationCodeLifetime": 300,
+      "requireClientSecret": false,
+      "allowedScopes": [
+        "read",
+        "write"
+      ],
+      "requireState": false,
+      "dynamicRegistration": {
+        "enabled": true,
+        "allowedGrantTypes": [
+          "authorization_code",
+          "refresh_token"
+        ],
+        "requiresAuthentication": false
+      }
+    }
+  },
+  "bearerKeys": []
+}

@@ -1,0 +1,1 @@
+{"mcpServers": {"napcat-group-info": {"command": "python", "args": ["C:\\Users\\h3189\\server\\maibot\\maibot\\MaiBot-0.12.2\\napcat_group_info_mcp\\run_direct.py"], "env": {"NAPCAT_HOST": "http://localhost:3000", "NAPCAT_TOKEN": "your_token_here", "ALLOWED_GROUPS": "628101497"}}}
