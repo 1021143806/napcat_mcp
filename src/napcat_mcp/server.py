@@ -21,6 +21,7 @@ from .napcat_client import NapCatClient
 
 ALLOWED_GROUPS: Optional[Set[int]] = None
 READONLY_MODE: bool = False
+DISABLED_TOOLS: Set[str] = set()
 
 allowed_groups_str = os.getenv("ALLOWED_GROUPS", "").strip()
 
@@ -42,6 +43,13 @@ if READONLY_MODE:
     print("✓ 只读模式: 已启用")
 else:
     print("✓ 读写模式: 已启用")
+
+disabled_str = os.getenv("DISABLED_TOOLS", "").strip()
+if disabled_str:
+    DISABLED_TOOLS = set(t.strip() for t in disabled_str.split(",") if t.strip())
+    print(f"✓ 禁用工具: {', '.join(sorted(DISABLED_TOOLS))}")
+else:
+    print("✓ 禁用工具: 无")
 
 
 def is_group_allowed(group_id: int) -> bool:
@@ -323,6 +331,9 @@ async def list_tools() -> list[Tool]:
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     if READONLY_MODE and name in WRITE_TOOLS:
         return [TextContent(type="text", text=f"权限拒绝: 只读模式已启用，工具 '{name}' 不可用")]
+
+    if name in DISABLED_TOOLS:
+        return [TextContent(type="text", text=f"权限拒绝: 工具 '{name}' 已被禁用")]
 
     try:
         async with await get_client() as client:
