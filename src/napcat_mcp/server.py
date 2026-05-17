@@ -252,6 +252,30 @@ WRITE_TOOLS = {
 
 
 # ============================================================================
+# Schema 清理工具
+# ============================================================================
+
+def clean_schema(schema: dict) -> dict:
+    """递归移除 Pydantic model_json_schema() 生成的 title 和 default 字段，
+    以满足 Claude API 对 JSON Schema draft 2020-12 的严格验证要求。"""
+    if not isinstance(schema, dict):
+        return schema
+    cleaned = {}
+    for key, value in schema.items():
+        if key in ("title", "default"):
+            continue
+        if key == "properties" and isinstance(value, dict):
+            cleaned[key] = {k: clean_schema(v) for k, v in value.items()}
+        elif key == "items" and isinstance(value, dict):
+            cleaned[key] = clean_schema(value)
+        elif key == "additionalProperties" and isinstance(value, dict):
+            cleaned[key] = clean_schema(value)
+        else:
+            cleaned[key] = value
+    return cleaned
+
+
+# ============================================================================
 # 工具定义
 # ============================================================================
 
@@ -259,67 +283,67 @@ WRITE_TOOLS = {
 async def list_tools() -> list[Tool]:
     return [
         # Group info (read-only)
-        Tool(name="get_group_info", description="Get group detailed information", inputSchema=GroupIdParam.model_json_schema()),
+        Tool(name="get_group_info", description="Get group detailed information", inputSchema=clean_schema(GroupIdParam.model_json_schema())),
         Tool(name="get_group_list", description="Get list of all joined groups", inputSchema={"type": "object", "properties": {}, "additionalProperties": False}),
-        Tool(name="get_group_honor_info", description="Get group honor information", inputSchema=GroupHonorParam.model_json_schema()),
-        Tool(name="get_group_at_all_remain", description="Get remaining @all count for group", inputSchema=GroupIdParam.model_json_schema()),
-        Tool(name="get_group_info_ex", description="Get group detailed information (extended)", inputSchema=GroupIdParam.model_json_schema()),
-        Tool(name="get_group_member_list", description="Get group member list", inputSchema=GroupIdParam.model_json_schema()),
-        Tool(name="get_group_member_info", description="Get specified group member detailed info", inputSchema=GroupMemberInfoParam.model_json_schema()),
-        Tool(name="get_group_root_files", description="Get group root directory file list", inputSchema=GroupIdParam.model_json_schema()),
-        Tool(name="get_group_files_by_folder", description="Get file list in specified group folder", inputSchema=GroupFilesByFolderParam.model_json_schema()),
-        Tool(name="get_group_file_system_info", description="Get group file system information", inputSchema=GroupIdParam.model_json_schema()),
-        Tool(name="get_group_file_url", description="Get group file download URL", inputSchema=GroupFileUrlParam.model_json_schema()),
-        Tool(name="get_group_msg_history", description="Get group message history", inputSchema=GroupMsgHistoryParam.model_json_schema()),
-        Tool(name="get_group_announcement_list", description="Get group announcement list", inputSchema=GroupIdParam.model_json_schema()),
-        Tool(name="get_essence_msg_list", description="Get group essence message list", inputSchema=GroupIdParam.model_json_schema()),
-        Tool(name="get_group_system_msg", description="Get group system messages", inputSchema=GroupIdParam.model_json_schema()),
-        Tool(name="get_group_ignore_add_request", description="Get group ignored join requests", inputSchema=GroupIdParam.model_json_schema()),
+        Tool(name="get_group_honor_info", description="Get group honor information", inputSchema=clean_schema(GroupHonorParam.model_json_schema())),
+        Tool(name="get_group_at_all_remain", description="Get remaining @all count for group", inputSchema=clean_schema(GroupIdParam.model_json_schema())),
+        Tool(name="get_group_info_ex", description="Get group detailed information (extended)", inputSchema=clean_schema(GroupIdParam.model_json_schema())),
+        Tool(name="get_group_member_list", description="Get group member list", inputSchema=clean_schema(GroupIdParam.model_json_schema())),
+        Tool(name="get_group_member_info", description="Get specified group member detailed info", inputSchema=clean_schema(GroupMemberInfoParam.model_json_schema())),
+        Tool(name="get_group_root_files", description="Get group root directory file list", inputSchema=clean_schema(GroupIdParam.model_json_schema())),
+        Tool(name="get_group_files_by_folder", description="Get file list in specified group folder", inputSchema=clean_schema(GroupFilesByFolderParam.model_json_schema())),
+        Tool(name="get_group_file_system_info", description="Get group file system information", inputSchema=clean_schema(GroupIdParam.model_json_schema())),
+        Tool(name="get_group_file_url", description="Get group file download URL", inputSchema=clean_schema(GroupFileUrlParam.model_json_schema())),
+        Tool(name="get_group_msg_history", description="Get group message history", inputSchema=clean_schema(GroupMsgHistoryParam.model_json_schema())),
+        Tool(name="get_group_announcement_list", description="Get group announcement list", inputSchema=clean_schema(GroupIdParam.model_json_schema())),
+        Tool(name="get_essence_msg_list", description="Get group essence message list", inputSchema=clean_schema(GroupIdParam.model_json_schema())),
+        Tool(name="get_group_system_msg", description="Get group system messages", inputSchema=clean_schema(GroupIdParam.model_json_schema())),
+        Tool(name="get_group_ignore_add_request", description="Get group ignored join requests", inputSchema=clean_schema(GroupIdParam.model_json_schema())),
         # Message sending and management
-        Tool(name="send_msg", description="Send message (generic)", inputSchema=SendMsgParam.model_json_schema()),
-        Tool(name="send_group_msg", description="Send group message", inputSchema=SendGroupMsgParam.model_json_schema()),
-        Tool(name="send_private_msg", description="Send private message", inputSchema=SendPrivateMsgParam.model_json_schema()),
-        Tool(name="delete_msg", description="Recall message", inputSchema=DeleteMsgParam.model_json_schema()),
-        Tool(name="get_msg", description="Get message details", inputSchema=GetMsgParam.model_json_schema()),
-        Tool(name="get_forward_msg", description="Get forward message", inputSchema=GetForwardMsgParam.model_json_schema()),
-        Tool(name="send_group_forward_msg", description="Send group forward message", inputSchema=SendGroupForwardMsgParam.model_json_schema()),
-        Tool(name="mark_msg_as_read", description="Mark message as read", inputSchema=MarkMsgAsReadParam.model_json_schema()),
+        Tool(name="send_msg", description="Send message (generic)", inputSchema=clean_schema(SendMsgParam.model_json_schema())),
+        Tool(name="send_group_msg", description="Send group message", inputSchema=clean_schema(SendGroupMsgParam.model_json_schema())),
+        Tool(name="send_private_msg", description="Send private message", inputSchema=clean_schema(SendPrivateMsgParam.model_json_schema())),
+        Tool(name="delete_msg", description="Recall message", inputSchema=clean_schema(DeleteMsgParam.model_json_schema())),
+        Tool(name="get_msg", description="Get message details", inputSchema=clean_schema(GetMsgParam.model_json_schema())),
+        Tool(name="get_forward_msg", description="Get forward message", inputSchema=clean_schema(GetForwardMsgParam.model_json_schema())),
+        Tool(name="send_group_forward_msg", description="Send group forward message", inputSchema=clean_schema(SendGroupForwardMsgParam.model_json_schema())),
+        Tool(name="mark_msg_as_read", description="Mark message as read", inputSchema=clean_schema(MarkMsgAsReadParam.model_json_schema())),
         # Group management
-        Tool(name="set_group_kick", description="Kick member from group", inputSchema=SetGroupKickParam.model_json_schema()),
-        Tool(name="set_group_ban", description="Mute group member", inputSchema=SetGroupBanParam.model_json_schema()),
-        Tool(name="set_group_whole_ban", description="Mute all members in group", inputSchema=SetGroupWholeBanParam.model_json_schema()),
-        Tool(name="set_group_admin", description="Set group admin", inputSchema=SetGroupAdminParam.model_json_schema()),
-        Tool(name="set_group_card", description="Set group member card", inputSchema=SetGroupCardParam.model_json_schema()),
-        Tool(name="set_group_name", description="Set group name", inputSchema=SetGroupNameParam.model_json_schema()),
-        Tool(name="set_group_leave", description="Leave or dismiss group", inputSchema=SetGroupLeaveParam.model_json_schema()),
-        Tool(name="set_group_special_title", description="Set group special title", inputSchema=SetGroupSpecialTitleParam.model_json_schema()),
-        Tool(name="set_group_add_request", description="Handle group join request", inputSchema=SetGroupAddRequestParam.model_json_schema()),
-        Tool(name="upload_group_file", description="Upload group file", inputSchema=UploadGroupFileParam.model_json_schema()),
-        Tool(name="delete_group_file", description="Delete group file", inputSchema=DeleteGroupFileParam.model_json_schema()),
-        Tool(name="send_group_notice", description="Send group announcement", inputSchema=SendGroupNoticeParam.model_json_schema()),
-        Tool(name="set_essence_msg", description="Set essence message", inputSchema=SetEssenceMsgParam.model_json_schema()),
-        Tool(name="delete_essence_msg", description="Delete essence message", inputSchema=DeleteEssenceMsgParam.model_json_schema()),
+        Tool(name="set_group_kick", description="Kick member from group", inputSchema=clean_schema(SetGroupKickParam.model_json_schema())),
+        Tool(name="set_group_ban", description="Mute group member", inputSchema=clean_schema(SetGroupBanParam.model_json_schema())),
+        Tool(name="set_group_whole_ban", description="Mute all members in group", inputSchema=clean_schema(SetGroupWholeBanParam.model_json_schema())),
+        Tool(name="set_group_admin", description="Set group admin", inputSchema=clean_schema(SetGroupAdminParam.model_json_schema())),
+        Tool(name="set_group_card", description="Set group member card", inputSchema=clean_schema(SetGroupCardParam.model_json_schema())),
+        Tool(name="set_group_name", description="Set group name", inputSchema=clean_schema(SetGroupNameParam.model_json_schema())),
+        Tool(name="set_group_leave", description="Leave or dismiss group", inputSchema=clean_schema(SetGroupLeaveParam.model_json_schema())),
+        Tool(name="set_group_special_title", description="Set group special title", inputSchema=clean_schema(SetGroupSpecialTitleParam.model_json_schema())),
+        Tool(name="set_group_add_request", description="Handle group join request", inputSchema=clean_schema(SetGroupAddRequestParam.model_json_schema())),
+        Tool(name="upload_group_file", description="Upload group file", inputSchema=clean_schema(UploadGroupFileParam.model_json_schema())),
+        Tool(name="delete_group_file", description="Delete group file", inputSchema=clean_schema(DeleteGroupFileParam.model_json_schema())),
+        Tool(name="send_group_notice", description="Send group announcement", inputSchema=clean_schema(SendGroupNoticeParam.model_json_schema())),
+        Tool(name="set_essence_msg", description="Set essence message", inputSchema=clean_schema(SetEssenceMsgParam.model_json_schema())),
+        Tool(name="delete_essence_msg", description="Delete essence message", inputSchema=clean_schema(DeleteEssenceMsgParam.model_json_schema())),
         # Friends / Users
         Tool(name="get_friend_list", description="Get friend list", inputSchema={"type": "object", "properties": {}, "additionalProperties": False}),
-        Tool(name="get_stranger_info", description="Get stranger information", inputSchema=GetStrangerInfoParam.model_json_schema()),
-        Tool(name="get_friend_msg_history", description="Get friend message history", inputSchema=FriendMsgHistoryParam.model_json_schema()),
-        Tool(name="send_like", description="Send like", inputSchema=SendLikeParam.model_json_schema()),
-        Tool(name="set_friend_add_request", description="Handle friend request", inputSchema=SetFriendAddRequestParam.model_json_schema()),
+        Tool(name="get_stranger_info", description="Get stranger information", inputSchema=clean_schema(GetStrangerInfoParam.model_json_schema())),
+        Tool(name="get_friend_msg_history", description="Get friend message history", inputSchema=clean_schema(FriendMsgHistoryParam.model_json_schema())),
+        Tool(name="send_like", description="Send like", inputSchema=clean_schema(SendLikeParam.model_json_schema())),
+        Tool(name="set_friend_add_request", description="Handle friend request", inputSchema=clean_schema(SetFriendAddRequestParam.model_json_schema())),
         # System management
         Tool(name="get_login_info", description="Get login account information", inputSchema={"type": "object", "properties": {}, "additionalProperties": False}),
         Tool(name="get_status", description="Get running status", inputSchema={"type": "object", "properties": {}, "additionalProperties": False}),
         Tool(name="get_version_info", description="Get version information", inputSchema={"type": "object", "properties": {}, "additionalProperties": False}),
-        Tool(name="get_cookies", description="Get cookies", inputSchema=GetCookiesParam.model_json_schema()),
+        Tool(name="get_cookies", description="Get cookies", inputSchema=clean_schema(GetCookiesParam.model_json_schema())),
         Tool(name="get_csrf_token", description="Get CSRF token", inputSchema={"type": "object", "properties": {}, "additionalProperties": False}),
-        Tool(name="get_credentials", description="Get credentials", inputSchema=GetCredentialsParam.model_json_schema()),
+        Tool(name="get_credentials", description="Get credentials", inputSchema=clean_schema(GetCredentialsParam.model_json_schema())),
         # Napcat extensions
-        Tool(name="ocr_image", description="OCR image recognition", inputSchema=OcrImageParam.model_json_schema()),
-        Tool(name="get_image", description="Get image information", inputSchema=GetImageParam.model_json_schema()),
-        Tool(name="get_record", description="Get voice record information", inputSchema=GetRecordParam.model_json_schema()),
+        Tool(name="ocr_image", description="OCR image recognition", inputSchema=clean_schema(OcrImageParam.model_json_schema())),
+        Tool(name="get_image", description="Get image information", inputSchema=clean_schema(GetImageParam.model_json_schema())),
+        Tool(name="get_record", description="Get voice record information", inputSchema=clean_schema(GetRecordParam.model_json_schema())),
         Tool(name="can_send_image", description="Check if can send image", inputSchema={"type": "object", "properties": {}, "additionalProperties": False}),
         Tool(name="can_send_record", description="Check if can send voice record", inputSchema={"type": "object", "properties": {}, "additionalProperties": False}),
         Tool(name="get_online_client", description="Get online client list", inputSchema={"type": "object", "properties": {}, "additionalProperties": False}),
-        Tool(name="set_qq_profile", description="Set QQ profile", inputSchema=SetQQProfileParam.model_json_schema()),
+        Tool(name="set_qq_profile", description="Set QQ profile", inputSchema=clean_schema(SetQQProfileParam.model_json_schema())),
     ]
 
 
