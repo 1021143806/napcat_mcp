@@ -256,13 +256,14 @@ WRITE_TOOLS = {
 # ============================================================================
 
 def clean_schema(schema: dict) -> dict:
-    """递归移除 Pydantic model_json_schema() 生成的 title 和 default 字段，
-    以满足 Claude API 对 JSON Schema draft 2020-12 的严格验证要求。"""
+    """递归移除 Pydantic model_json_schema() 生成的 $schema、title 和 default 字段，
+    以满足 Claude API 对 JSON Schema draft 2020-12 的严格验证要求。
+    同时规范化 required 字段（对象→数组）。"""
     if not isinstance(schema, dict):
         return schema
     cleaned = {}
     for key, value in schema.items():
-        if key in ("title", "default"):
+        if key in ("$schema", "title", "default"):
             continue
         if key == "properties" and isinstance(value, dict):
             cleaned[key] = {k: clean_schema(v) for k, v in value.items()}
@@ -270,6 +271,10 @@ def clean_schema(schema: dict) -> dict:
             cleaned[key] = clean_schema(value)
         elif key == "additionalProperties" and isinstance(value, dict):
             cleaned[key] = clean_schema(value)
+        elif key == "required" and isinstance(value, dict) and not isinstance(value, list):
+            # Normalize required from object (e.g. {"0": "target_qq"}) to list (["target_qq"])
+            # This can happen when some MCP servers serialize arrays as objects
+            cleaned[key] = list(value.values())
         else:
             cleaned[key] = value
     return cleaned
