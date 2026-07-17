@@ -198,10 +198,16 @@ class NapCatClient:
     # ============================================================================
 
     async def get_group_msg_history(self, group_id: int, message_seq: int = 0, count: int = 20) -> Dict[str, Any]:
-        return await self.call_api("get_group_msg_history", {"group_id": group_id, "message_seq": message_seq, "count": count})
+        params = {"group_id": group_id, "count": count}
+        if message_seq > 0:
+            params["message_seq"] = message_seq
+        return await self.call_api("get_group_msg_history", params)
 
     async def get_friend_msg_history(self, user_id: int, message_seq: int = 0, count: int = 20) -> Dict[str, Any]:
-        return await self.call_api("get_friend_msg_history", {"user_id": user_id, "message_seq": message_seq, "count": count})
+        params = {"user_id": user_id, "count": count}
+        if message_seq > 0:
+            params["message_seq"] = message_seq
+        return await self.call_api("get_friend_msg_history", params)
 
     # ============================================================================
     # 群公告相关 API
@@ -250,7 +256,9 @@ class NapCatClient:
     async def get_msg(self, message_id: int) -> Dict[str, Any]:
         return await self.call_api("get_msg", {"message_id": message_id})
 
-    async def get_forward_msg(self, message_id: int) -> Dict[str, Any]:
+    async def get_forward_msg(self, message_id: str) -> Dict[str, Any]:
+        # Keep forward IDs as strings: QQ commonly uses 19-digit values that
+        # cannot be represented exactly by JavaScript numbers.
         return await self.call_api("get_forward_msg", {"message_id": message_id})
 
     async def send_group_forward_msg(self, group_id: int, messages: List[Dict[str, Any]]) -> Dict[str, Any]:

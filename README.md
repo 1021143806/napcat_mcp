@@ -100,6 +100,12 @@ READONLY_MODE=true                 # 禁用所有写入操作
 ### Napcat 扩展（7 个）
 `ocr_image` `get_image` `get_record` `can_send_image` `can_send_record` `get_online_client` `set_qq_profile`
 
+## 消息历史与合并转发
+
+工具结果使用无损的紧凑 JSON 文本返回，避免大型或嵌套合并转发因 pretty-print 膨胀而被 MCP 客户端截断。合并转发的实际节点位于消息段的 `data.content` 中；`raw_message` 中的 `[object Object]` 只是 CQ 字符串表示，不是内容丢失。
+
+调用 `get_forward_msg` 时，请将 `message_id` 作为字符串传入。QQ 合并转发 ID 常为 19 位，若作为 JavaScript number 传递会超过安全整数范围并发生精度丢失。
+
 ## NapCat 配置
 
 确保 NapCat 的 OneBot11 配置中启用了 HTTP 服务器：

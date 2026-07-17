@@ -10,7 +10,7 @@ from typing import Any, Optional, Set
 
 from mcp.server import Server
 from mcp.types import Tool, TextContent
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .napcat_client import NapCatClient
 
@@ -115,7 +115,23 @@ class GetMsgParam(BaseModel):
     message_id: int = Field(description="Message ID")
 
 class GetForwardMsgParam(BaseModel):
-    message_id: int = Field(description="Message ID")
+    # Forward IDs are commonly 19-digit values and exceed JavaScript's safe
+    # integer range.  Advertise a string in the tool schema so MCP clients do
+    # not round the ID before it reaches NapCat.
+    message_id: str = Field(description="Forward message ID (pass as a string to preserve precision)")
+
+    @field_validator("message_id", mode="before")
+    @classmethod
+    def stringify_message_id(cls, value: Any) -> str:
+        # Keep accepting integer input from older clients for backwards
+        # compatibility.  Large IDs must still be supplied as strings because
+        # precision may already have been lost by a JavaScript client.
+        if value is None or isinstance(value, bool):
+            raise ValueError("forward message ID must be a non-empty string")
+        message_id = str(value).strip()
+        if not message_id:
+            raise ValueError("forward message ID must be a non-empty string")
+        return message_id
 
 class SendGroupForwardMsgParam(BaseModel):
     group_id: int = Field(description="Group ID")
@@ -278,6 +294,17 @@ def clean_schema(schema: dict) -> dict:
         else:
             cleaned[key] = value
     return cleaned
+
+
+def serialize_tool_result(result: Any) -> str:
+    """Serialize API results without inflating large nested message trees.
+
+    Pretty-printed JSON can be several times larger than the underlying data,
+    especially for merged-forward history.  MCP transports this value as text,
+    so compact JSON preserves the exact response while avoiding downstream
+    tool-output truncation.
+    """
+    return json.dumps(result, ensure_ascii=False, separators=(",", ":"))
 
 
 # ============================================================================
@@ -676,8 +703,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             else:
                 return [TextContent(type="text", text=f"未知工具: {name}")]
 
-            formatted_result = json.dumps(result, ensure_ascii=False, indent=2)
-            return [TextContent(type="text", text=formatted_result)]
+            return [TextContent(type="text", text=serialize_tool_result(result))]
 
     except Exception as e:
         error_msg = f"工具调用失败 [{name}]: {str(e)}"
