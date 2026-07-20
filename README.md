@@ -42,7 +42,8 @@ pip install -e .
         "NAPCAT_HOST": "http://localhost:3000",
         "NAPCAT_TOKEN": "your_token_here",
         "ALLOWED_GROUPS": "",
-        "READONLY_MODE": "false"
+        "READONLY_MODE": "false",
+        "NAPCAT_RESPONSE_MODE": "compact"
       }
     }
   }
@@ -57,6 +58,20 @@ pip install -e .
 | `NAPCAT_TOKEN` | NapCat 访问令牌 | 空 |
 | `ALLOWED_GROUPS` | 允许访问的群号（逗号分隔），留空=全部 | 空 |
 | `READONLY_MODE` | 只读模式（true/false） | `false` |
+| `NAPCAT_RESPONSE_MODE` | 返回格式：`compact` 面向 LLM 精简，`full` 保留完整 OneBot 字段 | `compact` |
+
+### LLM 友好的精简响应
+
+默认的 `compact` 模式会移除历史消息和合并转发中重复的事件元数据（如
+`self_id`、`post_type`、重复的 `raw_message`），并把群成员、群列表及好友列表编码为
+`{"columns": [...], "rows": [...], "count": N}`，避免每一行重复字段名。消息正文、
+发送者、时间、消息 ID/序号及嵌套转发内容仍会保留。
+
+如果现有程序依赖 NapCat 的原始完整响应，可设置：
+
+```bash
+NAPCAT_RESPONSE_MODE=full
+```
 
 ### 连接模式
 

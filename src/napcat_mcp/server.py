@@ -296,15 +296,101 @@ def clean_schema(schema: dict) -> dict:
     return cleaned
 
 
-def serialize_tool_result(result: Any) -> str:
-    """Serialize API results without inflating large nested message trees.
+def _compact_message_record(record: dict) -> dict:
+    """Keep the semantically useful part of a OneBot message event.
 
-    Pretty-printed JSON can be several times larger than the underlying data,
-    especially for merged-forward history.  MCP transports this value as text,
-    so compact JSON preserves the exact response while avoiding downstream
-    tool-output truncation.
+    NapCat repeats transport/event metadata on every history row (and again in
+    every merged-forward node).  ``raw_message`` also duplicates the structured
+    ``message`` field.  The compact shape is deliberately stable and recursive.
     """
-    return json.dumps(result, ensure_ascii=False, separators=(",", ":"))
+    sender = record.get("sender") or {}
+    compact = {
+        "seq": record.get("message_seq", record.get("real_seq")),
+        "id": record.get("message_id"),
+        "time": record.get("time"),
+        "user_id": record.get("user_id", sender.get("user_id")),
+        "name": sender.get("card") or sender.get("nickname"),
+        "message": _compact_nested_messages(record.get("message", [])),
+    }
+    return {key: value for key, value in compact.items() if value not in (None, "", [], {})}
+
+
+def _looks_like_message_record(value: dict) -> bool:
+    return (
+        "message" in value
+        and "time" in value
+        and ("message_id" in value or "message_seq" in value)
+        and ("sender" in value or "user_id" in value)
+    )
+
+
+def _compact_nested_messages(value: Any) -> Any:
+    """Recursively compact message records embedded in merged forwards."""
+    if isinstance(value, list):
+        return [_compact_nested_messages(item) for item in value]
+    if isinstance(value, dict):
+        if _looks_like_message_record(value):
+            return _compact_message_record(value)
+        return {key: _compact_nested_messages(item) for key, item in value.items()}
+    return value
+
+
+def _table(records: list, preferred_columns: tuple[str, ...]) -> dict:
+    """Encode homogeneous records once as columns + rows instead of repeating keys."""
+    columns = [column for column in preferred_columns if any(column in row for row in records)]
+    return {
+        "columns": columns,
+        "rows": [[row.get(column) for column in columns] for row in records],
+        "count": len(records),
+    }
+
+
+def compact_tool_result(tool_name: str, result: Any) -> Any:
+    """Return a loss-conscious, LLM-oriented representation for bulky APIs.
+
+    Set ``NAPCAT_RESPONSE_MODE=full`` to retain the exact upstream payload for
+    machine consumers that rely on every OneBot field.  Compact mode is the
+    default because MCP tool output is normally inserted directly into an LLM
+    context window.
+    """
+    if os.getenv("NAPCAT_RESPONSE_MODE", "compact").strip().lower() in {"full", "raw", "lossless"}:
+        return result
+
+    if tool_name in {"get_group_msg_history", "get_friend_msg_history", "get_forward_msg"}:
+        if isinstance(result, dict) and isinstance(result.get("messages"), list):
+            messages = [
+                _compact_message_record(item) if isinstance(item, dict) else item
+                for item in result["messages"]
+            ]
+            compact = {"messages": messages, "count": len(messages)}
+            # Preserve uncommon top-level metadata instead of silently losing it.
+            compact.update({key: _compact_nested_messages(value) for key, value in result.items() if key != "messages"})
+            return compact
+
+    if tool_name == "get_msg" and isinstance(result, dict) and _looks_like_message_record(result):
+        return _compact_message_record(result)
+
+    if tool_name == "get_group_member_list" and isinstance(result, list):
+        return _table(result, (
+            "user_id", "nickname", "card", "role", "title",
+            "last_sent_time", "join_time", "shut_up_timestamp", "is_robot",
+        ))
+
+    if tool_name == "get_group_list" and isinstance(result, list):
+        return _table(result, (
+            "group_id", "group_name", "member_count", "max_member_count", "group_remark",
+        ))
+
+    if tool_name == "get_friend_list" and isinstance(result, list):
+        return _table(result, ("user_id", "nickname", "remark", "sex", "level"))
+
+    return _compact_nested_messages(result)
+
+
+def serialize_tool_result(result: Any, tool_name: str = "") -> str:
+    """Serialize an API result as compact UTF-8 JSON for MCP text content."""
+    compacted = compact_tool_result(tool_name, result) if tool_name else result
+    return json.dumps(compacted, ensure_ascii=False, separators=(",", ":"))
 
 
 # ============================================================================
@@ -703,7 +789,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             else:
                 return [TextContent(type="text", text=f"未知工具: {name}")]
 
-            return [TextContent(type="text", text=serialize_tool_result(result))]
+            return [TextContent(type="text", text=serialize_tool_result(result, name))]
 
     except Exception as e:
         error_msg = f"工具调用失败 [{name}]: {str(e)}"
