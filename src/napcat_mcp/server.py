@@ -6,6 +6,7 @@ NapCat Full MCP Server
 import asyncio
 import json
 import os
+import time
 from typing import Any, Optional, Set
 
 from mcp.server import Server
@@ -84,7 +85,11 @@ class GroupFileUrlParam(BaseModel):
 class GroupMsgHistoryParam(BaseModel):
     group_id: int = Field(description="Group ID")
     message_seq: int = Field(default=0, description="Starting message sequence number")
-    count: int = Field(default=20, description="Count to retrieve")
+    count: int = Field(default=20, ge=1, le=100, description="Count to retrieve (1-100)")
+
+class ReadGroupMessagesParam(BaseModel):
+    group_id: int = Field(description="Group ID")
+    count: int = Field(default=20, ge=1, le=100, description="Number of recent messages (1-100)")
 
 class FriendMsgHistoryParam(BaseModel):
     user_id: int = Field(description="User QQ number")
@@ -296,6 +301,66 @@ def clean_schema(schema: dict) -> dict:
     return cleaned
 
 
+def _render_light_segment(segment: Any) -> str:
+    """Render one OneBot segment without exposing machine-oriented payload fields."""
+    if isinstance(segment, str):
+        return segment
+    if not isinstance(segment, dict):
+        return ""
+
+    segment_type = str(segment.get("type", "unknown"))
+    data = segment.get("data") if isinstance(segment.get("data"), dict) else {}
+    if segment_type == "text":
+        return str(data.get("text", ""))
+    if segment_type == "at":
+        target = data.get("qq", "")
+        return "@全体成员" if str(target) == "all" else f"@{target}"
+    if segment_type == "reply":
+        return "[回复]"
+
+    labels = {
+        "image": "图片", "record": "语音", "video": "视频", "file": "文件",
+        "face": "表情", "mface": "表情", "forward": "转发消息", "node": "转发消息",
+        "json": "卡片", "xml": "卡片", "location": "位置", "music": "音乐",
+        "dice": "骰子", "rps": "猜拳", "poke": "戳一戳", "contact": "名片",
+        "share": "分享", "markdown": "Markdown",
+    }
+    return f"[{labels.get(segment_type, segment_type)}]"
+
+
+def render_group_messages_light(result: Any) -> str:
+    """Render history as a compact timeline intended only for LLM reading."""
+    messages = result.get("messages", []) if isinstance(result, dict) else []
+    if not messages:
+        return "（没有消息）"
+
+    lines: list[str] = []
+    current_date = None
+    for record in messages:
+        if not isinstance(record, dict):
+            continue
+        timestamp = record.get("time")
+        try:
+            local_time = time.localtime(int(timestamp))
+            date = time.strftime("%Y-%m-%d", local_time)
+            clock = time.strftime("%H:%M", local_time)
+        except (TypeError, ValueError, OverflowError):
+            date, clock = "未知日期", "--:--"
+        if date != current_date:
+            lines.append(date)
+            current_date = date
+
+        sender = record.get("sender") if isinstance(record.get("sender"), dict) else {}
+        name = sender.get("card") or sender.get("nickname") or record.get("user_id") or "未知用户"
+        name = str(name).replace("\r", " ").replace("\n", " ")
+        content = "".join(_render_light_segment(segment) for segment in (record.get("message") or []))
+        if not content:
+            content = str(record.get("raw_message") or "[空消息]")
+        content = content.replace("\r\n", "\\n").replace("\r", "\\n").replace("\n", "\\n")
+        lines.append(f"{clock} {name}: {content}")
+    return "\n".join(lines) if lines else "（没有消息）"
+
+
 def _compact_message_record(record: dict) -> dict:
     """Keep the semantically useful part of a OneBot message event.
 
@@ -412,7 +477,8 @@ async def list_tools() -> list[Tool]:
         Tool(name="get_group_files_by_folder", description="Get file list in specified group folder", inputSchema=clean_schema(GroupFilesByFolderParam.model_json_schema())),
         Tool(name="get_group_file_system_info", description="Get group file system information", inputSchema=clean_schema(GroupIdParam.model_json_schema())),
         Tool(name="get_group_file_url", description="Get group file download URL", inputSchema=clean_schema(GroupFileUrlParam.model_json_schema())),
-        Tool(name="get_group_msg_history", description="Get group message history", inputSchema=clean_schema(GroupMsgHistoryParam.model_json_schema())),
+        Tool(name="get_group_msg_history", description="Get group message history with IDs and structured OneBot fields for pagination or follow-up actions", inputSchema=clean_schema(GroupMsgHistoryParam.model_json_schema())),
+        Tool(name="read_group_messages", description="Read recent group messages as a minimal human-readable timeline. Prefer this for understanding chat; use get_group_msg_history only when IDs, pagination, or raw segments are needed.", inputSchema=clean_schema(ReadGroupMessagesParam.model_json_schema())),
         Tool(name="get_group_announcement_list", description="Get group announcement list", inputSchema=clean_schema(GroupIdParam.model_json_schema())),
         Tool(name="get_essence_msg_list", description="Get group essence message list", inputSchema=clean_schema(GroupIdParam.model_json_schema())),
         Tool(name="get_group_system_msg", description="Get group system messages", inputSchema=clean_schema(GroupIdParam.model_json_schema())),
@@ -563,6 +629,14 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 if not is_group_allowed(group_id_to_check):
                     return [TextContent(type="text", text=f"权限拒绝: 群 {group_id_to_check} 不在允许访问的群列表中")]
                 result = await client.get_group_msg_history(params.group_id, params.message_seq, params.count)
+
+            elif name == "read_group_messages":
+                params = ReadGroupMessagesParam(**arguments)
+                group_id_to_check = params.group_id
+                if not is_group_allowed(group_id_to_check):
+                    return [TextContent(type="text", text=f"权限拒绝: 群 {group_id_to_check} 不在允许访问的群列表中")]
+                history = await client.get_group_msg_history(params.group_id, 0, params.count)
+                result = render_group_messages_light(history)
 
             elif name == "get_group_announcement_list":
                 params = GroupIdParam(**arguments)
@@ -789,6 +863,8 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             else:
                 return [TextContent(type="text", text=f"未知工具: {name}")]
 
+            if name == "read_group_messages":
+                return [TextContent(type="text", text=result)]
             return [TextContent(type="text", text=serialize_tool_result(result, name))]
 
     except Exception as e:

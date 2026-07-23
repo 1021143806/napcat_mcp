@@ -1,6 +1,15 @@
 import json
+import time
 
-from napcat_mcp.server import GetForwardMsgParam, compact_tool_result, serialize_tool_result
+import pytest
+
+from napcat_mcp.server import (
+    GetForwardMsgParam,
+    ReadGroupMessagesParam,
+    compact_tool_result,
+    render_group_messages_light,
+    serialize_tool_result,
+)
 
 
 def test_tool_result_uses_compact_lossless_json():
@@ -103,6 +112,37 @@ def test_full_response_mode_is_lossless(monkeypatch):
     monkeypatch.setenv("NAPCAT_RESPONSE_MODE", "full")
     result = {"messages": [{"raw_message": "keep me", "message": []}]}
     assert compact_tool_result("get_group_msg_history", result) is result
+
+
+
+def test_light_reader_is_plain_text_without_machine_ids(monkeypatch):
+    monkeypatch.setattr("napcat_mcp.server.time.localtime", lambda _: time.struct_time((2026, 7, 23, 8, 9, 0, 3, 204, -1)))
+    result = {"messages": [{
+        "message_id": 975974245,
+        "message_seq": 975974245,
+        "time": 1784675799,
+        "user_id": 2819915628,
+        "sender": {"nickname": "旅途不息", "card": ""},
+        "message": [
+            {"type": "reply", "data": {"id": "123"}},
+            {"type": "text", "data": {"text": "你好\n世界"}},
+            {"type": "image", "data": {"url": "https://very-long.example/image", "file": "secret.jpg"}},
+        ],
+    }]}
+
+    rendered = render_group_messages_light(result)
+
+    assert rendered == "2026-07-23\n08:09 旅途不息: [回复]你好\\n世界[图片]"
+    assert "975974245" not in rendered
+    assert "2819915628" not in rendered
+    assert "https://" not in rendered
+    assert "secret.jpg" not in rendered
+
+
+def test_light_reader_count_is_bounded():
+    assert ReadGroupMessagesParam(group_id=1, count=100).count == 100
+    with pytest.raises(ValueError):
+        ReadGroupMessagesParam(group_id=1, count=101)
 
 
 def test_forward_message_id_schema_is_string():

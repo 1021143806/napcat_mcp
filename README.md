@@ -95,10 +95,12 @@ ALLOWED_GROUPS=628101497,123456789 # 允许多个群
 READONLY_MODE=true                 # 禁用所有写入操作
 ```
 
-## 可用工具（55 个）
+## 可用工具（57 个）
 
-### 群聊信息（16 个）
-`get_group_info` `get_group_info_ex` `get_group_list` `get_group_honor_info` `get_group_at_all_remain` `get_group_member_list` `get_group_member_info` `get_group_root_files` `get_group_files_by_folder` `get_group_file_system_info` `get_group_file_url` `get_group_msg_history` `get_group_announcement_list` `get_essence_msg_list` `get_group_system_msg` `get_group_ignore_add_request`
+### 群聊信息（17 个）
+`get_group_info` `get_group_info_ex` `get_group_list` `get_group_honor_info` `get_group_at_all_remain` `get_group_member_list` `get_group_member_info` `get_group_root_files` `get_group_files_by_folder` `get_group_file_system_info` `get_group_file_url` `read_group_messages` `get_group_msg_history` `get_group_announcement_list` `get_essence_msg_list` `get_group_system_msg` `get_group_ignore_add_request`
+
+> 一般阅读群聊时优先使用 `read_group_messages`：它返回纯文本时间线，不含消息 ID、序号、图片 URL 等机器字段。只有需要分页、引用、撤回或原始 OneBot segment 时才调用 `get_group_msg_history`。
 
 ### 消息发送与管理（8 个）
 `send_msg` `send_group_msg` `send_private_msg` `delete_msg` `get_msg` `get_forward_msg` `send_group_forward_msg` `mark_msg_as_read`

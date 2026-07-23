@@ -17,6 +17,19 @@ LLM context when returned as MCP text content.
 Set `NAPCAT_RESPONSE_MODE=full` (aliases: `raw`, `lossless`) to return the exact
 NapCat data object without field compaction.
 
+## Dedicated lightweight reader
+
+`read_group_messages(group_id, count)` is intentionally separate from
+`get_group_msg_history`. It returns a plain-text timeline with date headings and lines
+like `HH:MM display name: content`. It omits message IDs/sequences, QQ IDs when a display
+name is available, event metadata, attachment URLs, and file fields. Text is emitted
+directly while non-text segments become short markers such as `[图片]`, `[回复]`, or
+`[转发消息]`. Use the detailed history tool only for pagination or follow-up operations.
+The count is bounded to 1-100.
+
+A live 17-message sample measured 12,887 B raw, 4,765 B in the existing compact JSON,
+and 1,065 B through the lightweight reader (91.7% below raw and 77.6% below compact).
+
 ## Real deployment benchmark
 
 Measured against a live NapCat instance on 2026-07-20; message contents were never
