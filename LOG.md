@@ -23,6 +23,8 @@
 - count 限制 1-100；沿用 ALLOWED_GROUPS 權限檢查
 - 真實 Claude 群 17 條抽樣：原始 12887 B、既有 compact JSON 4765 B、新 light 1065 B（比原始少91.7%，比 compact 少77.6%）；未輸出聊天正文
 - 測試：10 passed；工具列表 57 entries / 57 unique；詳細說明見 `RESPONSE_COMPACTION.md`
+- commit `fd3003c`；已部署 VPS 並重啟 MCPHub（pid 349873），`napcat_8_claude` 成功連線/列出 57 tools；live call 20條輸出1065 B/22行、純文字、無 seq/id key
+- VPS 備份：`src/napcat_mcp/server.py.bak.light-reader.20260723-080002`
 
 
 
