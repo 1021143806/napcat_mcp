@@ -3,18 +3,22 @@ NapCat Full MCP Server
 封装 NapCat 所有 HTTP API 的 MCP 服务器（支持 HTTP 和 WebSocket 双模式）
 """
 
+import argparse
 import asyncio
 import json
 import os
+import sys
 import time
 from typing import Any, Optional, Set
 
+from dotenv import load_dotenv
 from mcp.server import Server
-from mcp.types import Tool, TextContent
+from mcp.types import TextContent, Tool
 from pydantic import BaseModel, Field, field_validator
 
 from .napcat_client import NapCatClient
 
+load_dotenv()
 
 # ============================================================================
 # 配置
@@ -28,29 +32,29 @@ allowed_groups_str = os.getenv("ALLOWED_GROUPS", "").strip()
 
 if not allowed_groups_str or allowed_groups_str.lower() in ("all", "*"):
     ALLOWED_GROUPS = None
-    print("✓ 权限配置: 允许访问所有群")
+    print("✓ 权限配置: 允许访问所有群", file=sys.stderr)
 else:
     try:
         ALLOWED_GROUPS = set(int(g.strip()) for g in allowed_groups_str.split(",") if g.strip())
-        print(f"✓ 权限配置: 只允许访问群 {', '.join(map(str, sorted(ALLOWED_GROUPS)))}")
+        print(f"✓ 权限配置: 只允许访问群 {', '.join(map(str, sorted(ALLOWED_GROUPS)))}", file=sys.stderr)
     except ValueError:
-        print(f"警告: ALLOWED_GROUPS 环境变量格式错误: {allowed_groups_str}")
-        print("警告: 将允许访问所有群")
+        print(f"警告: ALLOWED_GROUPS 环境变量格式错误: {allowed_groups_str}", file=sys.stderr)
+        print("警告: 将允许访问所有群", file=sys.stderr)
         ALLOWED_GROUPS = None
 
 readonly_str = os.getenv("READONLY_MODE", "false").strip().lower()
 READONLY_MODE = readonly_str in ("true", "1", "yes")
 if READONLY_MODE:
-    print("✓ 只读模式: 已启用")
+    print("✓ 只读模式: 已启用", file=sys.stderr)
 else:
-    print("✓ 读写模式: 已启用")
+    print("✓ 读写模式: 已启用", file=sys.stderr)
 
 disabled_str = os.getenv("DISABLED_TOOLS", "").strip()
 if disabled_str:
     DISABLED_TOOLS = set(t.strip() for t in disabled_str.split(",") if t.strip())
-    print(f"✓ 禁用工具: {', '.join(sorted(DISABLED_TOOLS))}")
+    print(f"✓ 禁用工具: {', '.join(sorted(DISABLED_TOOLS))}", file=sys.stderr)
 else:
-    print("✓ 禁用工具: 无")
+    print("✓ 禁用工具: 无", file=sys.stderr)
 
 
 def is_group_allowed(group_id: int) -> bool:
@@ -872,30 +876,112 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         return [TextContent(type="text", text=error_msg)]
 
 
-async def main():
-    """启动 MCP 服务器"""
+def _csv_env(name: str) -> list[str]:
+    return [item.strip() for item in os.getenv(name, "").split(",") if item.strip()]
+
+
+def _is_loopback(host: str) -> bool:
+    return host in {"127.0.0.1", "localhost", "::1"}
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="NapCat MCP server")
+    parser.add_argument(
+        "--transport",
+        choices=("stdio", "streamable-http"),
+        default=os.getenv("MCP_TRANSPORT", "stdio"),
+        help="MCP transport (default: MCP_TRANSPORT or stdio)",
+    )
+    parser.add_argument("--host", default=os.getenv("MCP_HTTP_HOST", "127.0.0.1"))
+    parser.add_argument("--port", type=int, default=int(os.getenv("MCP_HTTP_PORT", "18080")))
+    parser.add_argument("--path", default=os.getenv("MCP_HTTP_PATH", "/mcp"))
+    parser.add_argument(
+        "--stateless",
+        action="store_true",
+        default=os.getenv("MCP_HTTP_STATELESS", "false").lower() in {"1", "true", "yes"},
+    )
+    parser.add_argument(
+        "--json-response",
+        action="store_true",
+        default=os.getenv("MCP_HTTP_JSON_RESPONSE", "false").lower() in {"1", "true", "yes"},
+    )
+    parser.add_argument("--log-level", default=os.getenv("MCP_HTTP_LOG_LEVEL", "info"))
+    return parser
+
+
+async def run_stdio() -> None:
+    """Run the server over the traditional local stdio transport."""
     from mcp.server.stdio import stdio_server
 
-    print("=" * 60)
-    print("NapCat Full MCP Server")
-    print("=" * 60)
-    if ALLOWED_GROUPS is None:
-        print("✓ 权限配置: 允许访问所有群")
-    else:
-        print(f"✓ 权限配置: 只允许访问群 {', '.join(map(str, sorted(ALLOWED_GROUPS)))}")
-    if READONLY_MODE:
-        print("✓ 模式: 只读")
-    else:
-        print("✓ 模式: 读写")
-    print("=" * 60)
-
+    _print_banner("stdio")
     async with stdio_server() as (read_stream, write_stream):
-        await app.run(
-            read_stream,
-            write_stream,
-            app.create_initialization_options()
+        await app.run(read_stream, write_stream, app.create_initialization_options())
+
+
+def _print_banner(transport: str, endpoint: str = "") -> None:
+    print("=" * 60, file=sys.stderr)
+    print("NapCat Full MCP Server", file=sys.stderr)
+    print(f"✓ MCP transport: {transport}", file=sys.stderr)
+    if endpoint:
+        print(f"✓ MCP endpoint: {endpoint}", file=sys.stderr)
+    if ALLOWED_GROUPS is None:
+        print("✓ 权限配置: 允许访问所有群", file=sys.stderr)
+    else:
+        print(f"✓ 权限配置: 只允许访问群 {', '.join(map(str, sorted(ALLOWED_GROUPS)))}", file=sys.stderr)
+    print(f"✓ 模式: {'只读' if READONLY_MODE else '读写'}", file=sys.stderr)
+    print("=" * 60, file=sys.stderr)
+
+
+def run_http(args: argparse.Namespace) -> None:
+    """Run the native Streamable HTTP server for RikkaHub and remote clients."""
+    from .http_transport import run_streamable_http
+
+    token = os.getenv("MCP_BEARER_TOKEN", "").strip()
+    if not _is_loopback(args.host) and not token:
+        raise SystemExit(
+            "拒绝启动：非本机 Streamable HTTP 必须设置 MCP_BEARER_TOKEN。"
         )
+
+    allowed_hosts = _csv_env("MCP_ALLOWED_HOSTS")
+    if not allowed_hosts:
+        if args.host in {"0.0.0.0", "::"}:
+            raise SystemExit(
+                "拒绝启动：监听通配地址时必须设置 MCP_ALLOWED_HOSTS，"
+                "例如 192.168.1.20:18080。"
+            )
+        host_header = f"[{args.host}]" if ":" in args.host and not args.host.startswith("[") else args.host
+        allowed_hosts = [f"{host_header}:*", "127.0.0.1:*", "localhost:*", "[::1]:*"]
+
+    allowed_origins = _csv_env("MCP_ALLOWED_ORIGINS") or [
+        "http://127.0.0.1:*",
+        "http://localhost:*",
+        "http://[::1]:*",
+    ]
+    path = args.path if args.path.startswith("/") else f"/{args.path}"
+    endpoint = f"http://{args.host}:{args.port}{path}"
+    _print_banner("streamable-http", endpoint)
+    run_streamable_http(
+        app,
+        host=args.host,
+        port=args.port,
+        path=path,
+        bearer_token=token,
+        allowed_hosts=allowed_hosts,
+        allowed_origins=allowed_origins,
+        stateless=args.stateless,
+        json_response=args.json_response,
+        log_level=args.log_level.lower(),
+    )
+
+
+def main(argv: list[str] | None = None) -> None:
+    """CLI entry point. Stdio remains the backwards-compatible default."""
+    args = _build_parser().parse_args(argv)
+    if args.transport == "stdio":
+        asyncio.run(run_stdio())
+    else:
+        run_http(args)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

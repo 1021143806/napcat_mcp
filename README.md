@@ -1,158 +1,310 @@
-# NapCat MCP Server
+# NapCat MCP
 
-封装 NapCat 所有 HTTP API 的 MCP 服务器，支持 HTTP 和 WebSocket 双模式。
+把 NapCat / OneBot 11 API 暴露為 MCP 工具，供 RikkaHub、Claude Desktop、Cline 等客戶端使用。
 
-> 基于 napcat-group-info-mcp 扩展，新增消息发送、群管理、好友管理、系统管理等全量 API。
+- **原生 Streamable HTTP**：RikkaHub 可直接連接，不再需要 Supergateway/MCPHub
+- **stdio**：保留相容 Claude Desktop、Cline 等本機 MCP 客戶端
+- **57 個工具**：群聊、訊息、好友、群管理、檔案及 NapCat 擴充 API
+- **安全限制**：群號白名單、唯讀模式、單工具停用、HTTP Bearer Token、DNS rebinding 防護
+- **LLM 友善輸出**：大型 OneBot 回應自動精簡，並提供輕量讀群訊息工具
 
-## 功能特性
+> Windows + RikkaHub + DeepSeek 從零部署請直接閱讀：
+> **[docs/RIKKAHUB_WINDOWS.md](docs/RIKKAHUB_WINDOWS.md)**
 
-- 📋 群聊信息获取（只读）
-- 👥 群成员信息获取（只读）
-- 📁 群文件管理（读写）
-- 💬 消息发送与管理
-- 📢 群公告管理
-- ⭐ 群精华消息管理
-- 👤 好友/用户管理
-- 🔧 群管理操作（踢人、禁言、管理员等）
-- 🖥️ 系统管理（登录信息、状态等）
-- 🎨 Napcat 扩展功能（OCR、图片、语音等）
-- 🔒 支持群号访问限制
-- 🔐 支持只读模式
-- 🌐 支持 HTTP 和 WebSocket 双模式
+---
 
-## 安装
+## 架構
+
+### RikkaHub（推薦）
+
+```text
+RikkaHub ── Streamable HTTP ──> napcat_mcp ── OneBot HTTP ──> NapCat/QQ
+              :18080/mcp                         127.0.0.1:3000
+```
+
+### 本機 stdio 客戶端
+
+```text
+Claude Desktop/Cline ── stdio ──> napcat_mcp ── OneBot HTTP/WS ──> NapCat
+```
+
+這裡有兩種不同的 HTTP：
+
+1. `NAPCAT_HOST` 是 **napcat_mcp → NapCat** 的 OneBot API。
+2. `MCP_HTTP_*` 是 **RikkaHub → napcat_mcp** 的 MCP Streamable HTTP。
+
+---
+
+## 要求
+
+- Python 3.10+
+- NapCat 4.9.91+
+- NapCat 已登入 QQ
+- NapCat OneBot 11 已啟用 HTTP 服務端
+
+建議 NapCat 與 napcat_mcp 在同一台電腦運行，並讓 OneBot 僅監聽：
+
+```text
+127.0.0.1:3000
+```
+
+不要把 NapCat 的 3000 端口暴露到網路。
+
+---
+
+## 安裝
 
 ```bash
 git clone https://github.com/1021143806/napcat_mcp.git
 cd napcat_mcp
-pip install -e .
+python -m venv .venv
 ```
 
-## 配置
+Windows：
 
-在 MCP 客户端配置文件中添加：
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e .
+Copy-Item .env.example .env
+```
+
+Linux/macOS：
+
+```bash
+.venv/bin/python -m pip install -e .
+cp .env.example .env
+```
+
+然後編輯 `.env`。
+
+---
+
+## RikkaHub：原生 Streamable HTTP
+
+### 最小安全配置
+
+```env
+# napcat_mcp 連 NapCat
+NAPCAT_HOST=http://127.0.0.1:3000
+NAPCAT_TOKEN=你的_NapCat_OneBot_Token
+ALLOWED_GROUPS=628101497
+READONLY_MODE=true
+NAPCAT_RESPONSE_MODE=compact
+
+# RikkaHub 連 napcat_mcp
+MCP_TRANSPORT=streamable-http
+MCP_HTTP_HOST=192.168.1.20
+MCP_HTTP_PORT=18080
+MCP_HTTP_PATH=/mcp
+MCP_BEARER_TOKEN=另一串獨立的長隨機密碼
+```
+
+`MCP_HTTP_HOST` 填 Windows 的區域網路或 Tailscale IP。若填 `0.0.0.0`，還必須明確設定：
+
+```env
+MCP_ALLOWED_HOSTS=192.168.1.20:18080
+```
+
+### 啟動
+
+Windows 雙擊或執行：
+
+```powershell
+.\start-http.bat
+```
+
+Linux/macOS：
+
+```bash
+./start-http.sh
+```
+
+也可直接執行：
+
+```powershell
+.\.venv\Scripts\python.exe -m napcat_mcp --transport streamable-http
+```
+
+健康檢查：
+
+```text
+http://192.168.1.20:18080/healthz
+```
+
+MCP 端點：
+
+```text
+http://192.168.1.20:18080/mcp
+```
+
+### RikkaHub 配置
+
+在 **設定 → MCP → `+` → Streamable HTTP** 填寫：
+
+- 名稱：`NapCat`
+- URL：`http://192.168.1.20:18080/mcp`
+- Header 名稱：`Authorization`
+- Header 值：`Bearer 你的_MCP_BEARER_TOKEN`
+
+保存後應顯示 `Connected`，並讀取到 57 個工具。接著在助手設定中啟用這個 MCP；僅添加到全域 MCP 列表並不會自動附加給助手。
+
+> HTTP Bearer Token 在純 HTTP 上不具傳輸加密。只應在可信任的區域網路或 Tailscale 中使用；若跨公網，請在前方加 HTTPS 反向代理，且不要直接公開 18080。
+
+---
+
+## stdio 模式
+
+stdio 仍是預設值，因此舊配置不需要改：
 
 ```json
 {
   "mcpServers": {
     "napcat-mcp": {
-      "command": "python",
-      "args": ["path/to/run_direct.py"],
+      "command": "C:\\path\\to\\napcat_mcp\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "napcat_mcp"],
       "env": {
-        "NAPCAT_HOST": "http://localhost:3000",
-        "NAPCAT_TOKEN": "your_token_here",
-        "ALLOWED_GROUPS": "",
-        "READONLY_MODE": "false",
-        "NAPCAT_RESPONSE_MODE": "compact"
+        "NAPCAT_HOST": "http://127.0.0.1:3000",
+        "NAPCAT_TOKEN": "your_napcat_token",
+        "ALLOWED_GROUPS": "628101497",
+        "READONLY_MODE": "true"
       }
     }
   }
 }
 ```
 
-## 环境变量
-
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `NAPCAT_HOST` | NapCat 服务器地址 | `http://localhost:3000` |
-| `NAPCAT_TOKEN` | NapCat 访问令牌 | 空 |
-| `ALLOWED_GROUPS` | 允许访问的群号（逗号分隔），留空=全部 | 空 |
-| `READONLY_MODE` | 只读模式（true/false） | `false` |
-| `NAPCAT_RESPONSE_MODE` | 返回格式：`compact` 面向 LLM 精简，`full` 保留完整 OneBot 字段 | `compact` |
-
-### LLM 友好的精简响应
-
-默认的 `compact` 模式会移除历史消息和合并转发中重复的事件元数据（如
-`self_id`、`post_type`、重复的 `raw_message`），并把群成员、群列表及好友列表编码为
-`{"columns": [...], "rows": [...], "count": N}`，避免每一行重复字段名。消息正文、
-发送者、时间、消息 ID/序号及嵌套转发内容仍会保留。
-
-如果现有程序依赖 NapCat 的原始完整响应，可设置：
+也可執行：
 
 ```bash
-NAPCAT_RESPONSE_MODE=full
+python -m napcat_mcp --transport stdio
 ```
 
-### 连接模式
+所有啟動日誌均寫入 `stderr`，不會污染 stdio MCP 協議的 `stdout`。
 
-根据 `NAPCAT_HOST` 前缀自动选择：
-- `http://` 或 `https://` → HTTP 模式
-- `ws://` 或 `wss://` → WebSocket 模式
+---
 
-## 安全特性
+## 環境變數
 
-### 群号访问限制
+### NapCat / 權限
 
-```bash
-ALLOWED_GROUPS=                    # 允许所有群
-ALLOWED_GROUPS=628101497           # 只允许单个群
-ALLOWED_GROUPS=628101497,123456789 # 允许多个群
+| 變數 | 說明 | 預設值 |
+|---|---|---|
+| `NAPCAT_HOST` | NapCat OneBot HTTP/WS 地址 | `http://localhost:3000` |
+| `NAPCAT_TOKEN` | NapCat OneBot Token | 空 |
+| `ALLOWED_GROUPS` | 允許操作的群號，逗號分隔；空值表示全部 | 空 |
+| `READONLY_MODE` | 禁用所有寫入工具 | `false` |
+| `DISABLED_TOOLS` | 額外禁用的工具名，逗號分隔 | 空 |
+| `NAPCAT_RESPONSE_MODE` | `compact` 或 `full` | `compact` |
+
+### MCP Streamable HTTP
+
+| 變數 | 說明 | 預設值 |
+|---|---|---|
+| `MCP_TRANSPORT` | `stdio` / `streamable-http` | `stdio` |
+| `MCP_HTTP_HOST` | HTTP 監聽地址 | `127.0.0.1` |
+| `MCP_HTTP_PORT` | HTTP 監聽端口 | `18080` |
+| `MCP_HTTP_PATH` | MCP 路徑 | `/mcp` |
+| `MCP_BEARER_TOKEN` | MCP 靜態 Bearer Token | 空 |
+| `MCP_ALLOWED_HOSTS` | DNS rebinding Host 白名單 | 自動依監聽 IP 產生 |
+| `MCP_ALLOWED_ORIGINS` | Origin 白名單 | localhost |
+| `MCP_HTTP_STATELESS` | 每個請求使用獨立 session | `false` |
+| `MCP_HTTP_JSON_RESPONSE` | 使用 JSON 而非 SSE 回應 | `false` |
+| `MCP_HTTP_LOG_LEVEL` | Uvicorn 日誌級別 | `info` |
+
+安全保護：
+
+- 只要監聽地址不是 loopback，就強制要求 `MCP_BEARER_TOKEN`。
+- 監聽 `0.0.0.0` / `::` 時強制要求 `MCP_ALLOWED_HOSTS`。
+- Bearer 驗證使用 constant-time 比較。
+- 狀態型 session 綁定建立它的認證主體。
+
+---
+
+## 安全模式
+
+### 群號白名單
+
+```env
+ALLOWED_GROUPS=628101497
+ALLOWED_GROUPS=628101497,123456789
 ```
 
-### 只读模式
+正式部署不建議留空、`all` 或 `*`。
 
-```bash
-READONLY_MODE=true                 # 禁用所有写入操作
+### 唯讀模式
+
+```env
+READONLY_MODE=true
 ```
 
-## 可用工具（57 个）
+首次連接 RikkaHub 時建議保持 `true`。確認查詢功能正常後，再決定是否開放寫入工具；RikkaHub 中所有發訊息、撤回、踢人、禁言、群設定和檔案操作工具都應開啟 **Needs Approval**。
 
-### 群聊信息（17 个）
-`get_group_info` `get_group_info_ex` `get_group_list` `get_group_honor_info` `get_group_at_all_remain` `get_group_member_list` `get_group_member_info` `get_group_root_files` `get_group_files_by_folder` `get_group_file_system_info` `get_group_file_url` `read_group_messages` `get_group_msg_history` `get_group_announcement_list` `get_essence_msg_list` `get_group_system_msg` `get_group_ignore_add_request`
+---
 
-> 一般阅读群聊时优先使用 `read_group_messages`：它返回纯文本时间线，不含消息 ID、序号、图片 URL 等机器字段。只有需要分页、引用、撤回或原始 OneBot segment 时才调用 `get_group_msg_history`。
+## 工具
 
-### 消息发送与管理（8 个）
-`send_msg` `send_group_msg` `send_private_msg` `delete_msg` `get_msg` `get_forward_msg` `send_group_forward_msg` `mark_msg_as_read`
+共 57 個工具，包括：
 
-### 群管理（13 个）
-`set_group_kick` `set_group_ban` `set_group_whole_ban` `set_group_admin` `set_group_card` `set_group_name` `set_group_leave` `set_group_special_title` `set_group_add_request` `upload_group_file` `delete_group_file` `send_group_notice` `set_essence_msg` `delete_essence_msg`
+- 群資訊、群成員、群檔案、歷史訊息
+- 發送/撤回訊息、合併轉發
+- 群管理、公告、精華訊息
+- 好友與使用者
+- 登入狀態、版本、憑證
+- OCR、圖片、語音及 NapCat 擴充功能
 
-### 好友/用户（5 个）
-`get_friend_list` `get_stranger_info` `get_friend_msg_history` `send_like` `set_friend_add_request`
+一般閱讀群聊時優先使用：
 
-### 系统管理（6 个）
-`get_login_info` `get_status` `get_version_info` `get_cookies` `get_csrf_token` `get_credentials`
+```text
+read_group_messages(group_id, count)
+```
 
-### Napcat 扩展（7 个）
-`ocr_image` `get_image` `get_record` `can_send_image` `can_send_record` `get_online_client` `set_qq_profile`
+它只返回人類可讀時間線，不攜帶訊息 ID、圖片 URL 等大型欄位。只有需要分頁、引用、撤回或原始 OneBot segment 時，才使用 `get_group_msg_history`。
 
-## 消息历史与合并转发
+---
 
-工具结果使用无损的紧凑 JSON 文本返回，避免大型或嵌套合并转发因 pretty-print 膨胀而被 MCP 客户端截断。合并转发的实际节点位于消息段的 `data.content` 中；`raw_message` 中的 `[object Object]` 只是 CQ 字符串表示，不是内容丢失。
-
-调用 `get_forward_msg` 时，请将 `message_id` 作为字符串传入。QQ 合并转发 ID 常为 19 位，若作为 JavaScript number 传递会超过安全整数范围并发生精度丢失。
-
-## NapCat 配置
-
-确保 NapCat 的 OneBot11 配置中启用了 HTTP 服务器：
+## NapCat OneBot 配置示例
 
 ```json
 {
   "network": {
-    "httpServers": [{
-      "enable": true,
-      "name": "napcat mcp",
-      "host": "127.0.0.1",
-      "port": 3000,
-      "enableCors": true,
-      "enableWebsocket": true,
-      "messagePostFormat": "array",
-      "token": "your_token_here",
-      "debug": false
-    }]
+    "httpServers": [
+      {
+        "enable": true,
+        "name": "napcat mcp",
+        "host": "127.0.0.1",
+        "port": 3000,
+        "enableCors": true,
+        "enableWebsocket": true,
+        "messagePostFormat": "array",
+        "token": "your_napcat_token",
+        "debug": false
+      }
+    ]
   }
 }
 ```
 
-## 技术细节
+NapCat WebUI 中應建立的是 **HTTP 服務端**，不是 HTTP 客戶端。
 
-- 基于 OneBot11 标准
-- 兼容 NapCat 4.9.91+
-- HTTP 模式使用 `httpx` 异步客户端
-- WebSocket 模式使用 `websockets` 库
-- 使用 Pydantic 进行参数验证
+---
 
-## 许可证
+## 測試
+
+```bash
+python -m pip install -e ".[dev]"
+pytest -q tests
+ruff check src tests run_direct.py
+```
+
+測試包含：
+
+- Streamable HTTP MCP 完整 initialize / tools/list
+- Bearer Token 拒絕未授權請求
+- 非本機監聽未設 Token 時拒絕啟動
+- 57 個工具完整性
+- 回應精簡與 19 位合併轉發 ID 精度
+
+---
+
+## 授權
 
 AGPL-3.0

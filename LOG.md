@@ -29,3 +29,13 @@
 
 
 ---
+
+【NapCat MCP 原生 Streamable HTTP 與 RikkaHub 部署（2026-08-03）】
+- 版本升至 0.3.0；新增原生 MCP Streamable HTTP，不再需要 Supergateway/MCPHub 轉發；stdio 保持預設以相容既有客戶端。
+- 新增 `src/napcat_mcp/http_transport.py`：Starlette/Uvicorn + 官方 `StreamableHTTPSessionManager`，提供 `/mcp` 與 `/healthz`。
+- HTTP 安全：遠端監聽強制 `MCP_BEARER_TOKEN`；靜態 Bearer 使用 constant-time 比較；stateful session 綁定認證主體；啟用 DNS rebinding Host/Origin 驗證；監聽通配地址時強制填 `MCP_ALLOWED_HOSTS`。
+- 修正原本所有啟動 `print()` 寫 stdout、可能污染 stdio MCP 協議的問題，統一改寫 stderr。
+- 修正 `__main__.py`、`run_direct.py` 與 `start.bat/start.sh` 的舊 async 入口/舊包名；新增 `start-http.bat/start-http.sh`。
+- 加入 `.env` 自動讀取與完整 HTTP 設定範例；MCP SDK 鎖定 `>=1.28,<2`（需要 session owner/idle timeout 能力）。
+- README 重寫，新增 `docs/RIKKAHUB_WINDOWS.md`：NapCat 安裝、Windows OpenSSH、RikkaHub Workspace SSH、公鑰、DeepSeek 可直接執行的部署提示、RikkaHub Header 配置與排障。
+- 測試：12 passed；ruff 全過；原生 HTTP initialize/tools/list 57 tools；無 Token 401；遠端無 Token 拒絕啟動；stdio initialize/tools/list 57 tools。

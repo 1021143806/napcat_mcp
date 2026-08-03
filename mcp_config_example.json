@@ -1,14 +1,14 @@
 {
   "mcpServers": {
-    "napcat-group-info": {
-      "command": "python",
-      "args": [
-        "run_direct.py"
-      ],
+    "napcat-mcp": {
+      "command": "C:\\NapCatMCP\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "napcat_mcp"],
       "env": {
-        "NAPCAT_HOST": "http://localhost:3000",
-        "NAPCAT_TOKEN": "your_token_here",
-        "ALLOWED_GROUPS": "628101497"
+        "NAPCAT_HOST": "http://127.0.0.1:3000",
+        "NAPCAT_TOKEN": "your_napcat_onebot_token",
+        "ALLOWED_GROUPS": "628101497",
+        "READONLY_MODE": "true",
+        "NAPCAT_RESPONSE_MODE": "compact"
       }
     }
   }

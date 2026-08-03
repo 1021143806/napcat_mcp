@@ -1,16 +1,17 @@
 [project]
 name = "napcat-mcp"
-version = "0.2.0"
-description = "MCP server wrapping all NapCat HTTP APIs (full access, HTTP + WebSocket)"
+version = "0.3.0"
+description = "NapCat OneBot MCP server with stdio and native Streamable HTTP transports"
 authors = [
     {name = "MaiBot Community"}
 ]
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp>=1.0.0",
+    "mcp>=1.28.0,<2.0.0",
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
     "websockets>=13.0",
 ]
 

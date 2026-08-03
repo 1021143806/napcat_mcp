@@ -10,4 +10,9 @@ if ! .venv/bin/python -c 'import napcat_mcp' >/dev/null 2>&1; then
     .venv/bin/python -m pip install -e .
 fi
 
-exec .venv/bin/python -m napcat_mcp
+if [ ! -f .env ]; then
+    echo '[NapCat MCP] ERROR: .env not found. Copy .env.example to .env and configure it first.' >&2
+    exit 1
+fi
+
+exec .venv/bin/python -m napcat_mcp --transport streamable-http
