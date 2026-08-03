@@ -947,7 +947,7 @@ def run_http(args: argparse.Namespace) -> None:
         if args.host in {"0.0.0.0", "::"}:
             raise SystemExit(
                 "拒绝启动：监听通配地址时必须设置 MCP_ALLOWED_HOSTS，"
-                "例如 192.168.1.20:18080。"
+                "例如 <WINDOWS-LAN-IP>:18080。"
             )
         host_header = f"[{args.host}]" if ":" in args.host and not args.host.startswith("[") else args.host
         allowed_hosts = [f"{host_header}:*", "127.0.0.1:*", "localhost:*", "[::1]:*"]

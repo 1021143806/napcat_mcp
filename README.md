@@ -92,7 +92,7 @@ NAPCAT_RESPONSE_MODE=compact
 
 # RikkaHub 連 napcat_mcp
 MCP_TRANSPORT=streamable-http
-MCP_HTTP_HOST=192.168.1.20
+MCP_HTTP_HOST=<WINDOWS-LAN-IP>
 MCP_HTTP_PORT=18080
 MCP_HTTP_PATH=/mcp
 MCP_BEARER_TOKEN=另一串獨立的長隨機密碼
@@ -101,7 +101,7 @@ MCP_BEARER_TOKEN=另一串獨立的長隨機密碼
 `MCP_HTTP_HOST` 填 Windows 的區域網路或 Tailscale IP。若填 `0.0.0.0`，還必須明確設定：
 
 ```env
-MCP_ALLOWED_HOSTS=192.168.1.20:18080
+MCP_ALLOWED_HOSTS=<WINDOWS-LAN-IP>:18080
 ```
 
 ### 啟動
@@ -127,13 +127,13 @@ Linux/macOS：
 健康檢查：
 
 ```text
-http://192.168.1.20:18080/healthz
+http://<WINDOWS-LAN-IP>:18080/healthz
 ```
 
 MCP 端點：
 
 ```text
-http://192.168.1.20:18080/mcp
+http://<WINDOWS-LAN-IP>:18080/mcp
 ```
 
 ### RikkaHub 配置
@@ -141,7 +141,7 @@ http://192.168.1.20:18080/mcp
 在 **設定 → MCP → `+` → Streamable HTTP** 填寫：
 
 - 名稱：`NapCat`
-- URL：`http://192.168.1.20:18080/mcp`
+- URL：`http://<WINDOWS-LAN-IP>:18080/mcp`
 - Header 名稱：`Authorization`
 - Header 值：`Bearer 你的_MCP_BEARER_TOKEN`
 

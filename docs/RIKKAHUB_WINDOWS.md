@@ -94,7 +94,7 @@ Get-NetIPAddress -AddressFamily IPv4 |
   Select-Object InterfaceAlias,IPAddress
 ```
 
-記下可從手機訪問的 IP，例如 `192.168.1.20`。
+記下可從手機訪問的 IP，例如 `<WINDOWS-LAN-IP>`。
 
 ---
 
@@ -135,7 +135,7 @@ Restart-Service sshd
 ```bash
 ssh -i ~/.ssh/napcat_windows \
   -o StrictHostKeyChecking=accept-new \
-  Windows用戶名@192.168.1.20 \
+  Windows用戶名@<WINDOWS-LAN-IP> \
   'whoami'
 ```
 
@@ -144,7 +144,7 @@ ssh -i ~/.ssh/napcat_windows \
 ```bash
 cat > ~/.ssh/config <<'EOF'
 Host napcat-pc
-    HostName 192.168.1.20
+    HostName <WINDOWS-LAN-IP>
     User Windows用戶名
     IdentityFile ~/.ssh/napcat_windows
     IdentitiesOnly yes
@@ -170,7 +170,7 @@ Windows SSH 別名：napcat-pc
 NapCat 地址：http://127.0.0.1:3000
 NapCat OneBot Token：<填 OneBot Token>
 允許群號：<填群號，多個用英文逗號>
-Windows 區域網路/Tailscale IP：<例如 192.168.1.20>
+Windows 區域網路/Tailscale IP：<例如 <WINDOWS-LAN-IP>>
 
 必須遵守：
 1. 直接執行，不要只寫教程。
@@ -241,7 +241,7 @@ DeepSeek 完成後：
 3. URL：
 
    ```text
-   http://192.168.1.20:18080/mcp
+   http://<WINDOWS-LAN-IP>:18080/mcp
    ```
 
 4. 自訂 Header：
@@ -296,7 +296,7 @@ Bearer <MCP_BEARER_TOKEN>
 若 `MCP_HTTP_HOST=0.0.0.0`，必須配置：
 
 ```env
-MCP_ALLOWED_HOSTS=192.168.1.20:18080
+MCP_ALLOWED_HOSTS=<WINDOWS-LAN-IP>:18080
 ```
 
 更推薦直接讓 `MCP_HTTP_HOST` 綁定實際 IP。
